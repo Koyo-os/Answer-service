@@ -18,13 +18,13 @@ type (
 	}
 
 	Answer struct {
-		ID        uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		FormID    uuid.UUID `gorm:"type:uuid" json:"form_id"`
-		UserID    uuid.UUID `gorm:"type:uuid" json:"user_id"`
-		IsComplete bool     `gorm:"default:false" json:"is_complete"`
-		Elements  []Element `gorm:"foreignKey:AnswerID" json:"elements"`
+		ID         uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
+		CreatedAt  time.Time `json:"created_at"`
+		UpdatedAt  time.Time `json:"updated_at"`
+		FormID     uuid.UUID `gorm:"type:uuid" json:"form_id"`
+		UserID     uuid.UUID `gorm:"type:uuid" json:"user_id"`
+		IsComplete bool      `gorm:"default:false" json:"is_complete"`
+		Elements   []Element `gorm:"foreignKey:AnswerID" json:"elements"`
 	}
 )
 
