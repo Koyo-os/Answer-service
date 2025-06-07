@@ -1,16 +1,27 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Koyo-os/answer-service/internal/config"
 	"github.com/Koyo-os/answer-service/internal/entity"
 	"github.com/Koyo-os/answer-service/internal/repository"
+	"github.com/Koyo-os/answer-service/internal/service"
+	"github.com/Koyo-os/answer-service/pkg/closer"
+	"github.com/Koyo-os/answer-service/pkg/health"
 	"github.com/Koyo-os/answer-service/pkg/logger"
 	"github.com/Koyo-os/answer-service/pkg/retrier"
+	"github.com/Koyo-os/answer-service/pkg/transport/casher"
+	"github.com/Koyo-os/answer-service/pkg/transport/consumer"
+	"github.com/Koyo-os/answer-service/pkg/transport/listener"
+	"github.com/Koyo-os/answer-service/pkg/transport/publisher"
+	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -69,5 +80,63 @@ func main() {
 
 	repo := repository.NewRepository(db, logger)
 
-	
+	rabbitmqConns, err := retrier.MultiConnects(2, func() (*amqp.Connection, error) {
+		return amqp.Dial(cfg.Urls["rabbitmq"])
+	}, &retrier.RetrierOpts{Count: 3, Interval: 5})
+	if err != nil {
+		logger.Error("error connect to rabbitmq",
+			zap.String("url", cfg.Urls["rabbitmq"]),
+			zap.Error(err))
+
+		return
+	}
+
+	publisher, err := publisher.Init(cfg, logger, rabbitmqConns[0])
+	if err != nil {
+		logger.Error("error initialize publisher", zap.Error(err))
+
+		return
+	}
+
+	consumer, err := consumer.Init(cfg, logger, rabbitmqConns[1])
+	if err != nil {
+		logger.Error("error initialize consumer", zap.Error(err))
+
+		return
+	}
+
+	redisConn, err := retrier.Connect(3, 5, func() (*redis.Client, error) {
+		client := redis.NewClient(&redis.Options{
+			Addr:     cfg.Urls["redis"],
+			DB:       0,
+			Password: "",
+		})
+
+		return client, client.Ping(context.Background()).Err()
+	})
+	if err != nil {
+		logger.Error("error connect to redis", zap.Error(err))
+
+		return
+	}
+
+	casher := casher.Init(redisConn, logger)
+
+	core := service.NewService(casher, publisher, repo, 10 * time.Second)
+
+	listener := listener.NewListener(logger, core, eventChan)
+
+	logger.Info("service ready to start!")
+
+	healther := health.NewHealthChecker(publisher, casher)
+
+	go listener.Run(context.Background())
+	go consumer.ConsumeMessages(eventChan)
+	go healther.RunServer(":8080")
+
+
+	<- signalChan
+
+	closer := closer.NewShutdown(publisher, casher, consumer)
+	closer.ShutdownAll(context.Background())
 }
