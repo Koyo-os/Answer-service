@@ -7,14 +7,6 @@ type (
 
 	Queues map[string]string
 
-	DB struct {
-		Host     string
-		Port     string
-		User     string
-		Password string
-		DBName   string
-	}
-
 	HealthCheck struct {
 		Port string
 		Use  bool
@@ -30,7 +22,6 @@ type (
 	Config struct {
 		Exchanges   Exchanges
 		Queues      Queues
-		DB          DB
 		RetrierOpts RetrierOpts
 		Urls        Urls
 		HealthCheck HealthCheck
@@ -46,13 +37,6 @@ func NewConfig() *Config {
 		Queues: Queues{
 			"form":   "form",
 			"answer": "answer",
-		},
-		DB: DB{
-			Host:     "localhost",
-			Port:     "5432",
-			User:     "postgres",
-			Password: "postgres",
-			DBName:   "postgres",
 		},
 		RetrierOpts: RetrierOpts{
 			MaxRetries: 3,
