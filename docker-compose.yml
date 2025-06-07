@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: answerdb
+      MYSQL_USER: answeruser
+      MYSQL_PASSWORD: answerpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  answer-service:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile
+    container_name: answer-service
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+      - rabbitmq
+      - redis
+    environment:
+      DB_USER: answeruser
+      DB_PASSWORD: answerpass
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: answerdb
+      # These match the config.NewConfig() defaults
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      REDIS_URL: redis:6379
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+
+volumes:
+  mariadb_data:
+  redis_data:
+
+networks:
+  backend:
+    driver: bridge
