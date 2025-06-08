@@ -38,7 +38,7 @@ services:
   answer-service:
     build:
       context: ../../
-      dockerfile: deployments/docker/Dockerfile
+      dockerfile: dockerfile
     container_name: answer-service
     restart: unless-stopped
     depends_on:
